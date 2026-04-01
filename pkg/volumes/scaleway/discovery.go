@@ -31,24 +31,30 @@ func (a *Volumes) Poll() (map[string]discovery.Node, error) {
 	peers := make(map[string]discovery.Node)
 	klog.V(2).Infof("Discovering peers with volumes matching labels: %v", a.matchTags)
 
-	etcdVolumes, err := getMatchingVolumes(a.instanceAPI, a.zone, a.matchTags)
+	etcdVolumes, err := a.getMatchingBlockVolumes(a.matchTags)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get matching volumes: %w", err)
 	}
 
 	for _, volume := range etcdVolumes {
-		if volume.Server == nil {
-			// Volume doesn't have a server attached yet
+		// Find the server this volume is attached to via references
+		var serverID string
+		for _, ref := range volume.References {
+			if ref.ProductResourceType == productResourceTypeInstanceServer {
+				serverID = ref.ProductResourceID
+				break
+			}
+		}
+		if serverID == "" {
 			continue
 		}
-		serverID := volume.Server.ID
 
 		ip, err := a.getServerIP(serverID)
 		if err != nil {
 			return nil, fmt.Errorf("getting IP for server %s: %w", serverID, err)
 		}
 
-		klog.V(2).Infof("Discovered volume %s(%s) of type %s attached to server %s", volume.Name, volume.ID, volume.VolumeType, serverID)
+		klog.V(2).Infof("Discovered volume %s(%s) of type %s attached to server %s", volume.Name, volume.ID, volume.Type, serverID)
 		// We use the etcd node ID as the persistent identifier, because the data determines who we are
 		node := discovery.Node{
 			ID:        "vol-" + volume.ID,
