@@ -78,8 +78,11 @@ func NewVolumes(clusterName string, volumeTags []string, nameTag string) (*Volum
 		ServerID: serverID,
 		Zone:     zone,
 	})
-	if err != nil || server == nil || server.Server == nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get the running server: %w", err)
+	}
+	if server == nil || server.Server == nil {
+		return nil, fmt.Errorf("failed to get the running server: empty response")
 	}
 	klog.V(2).Infof("Found the running server: %q", server.Server.Name)
 
@@ -265,8 +268,11 @@ func (a *Volumes) getServerIP(serverID string) (string, error) {
 		ServerID: serverID,
 		Zone:     a.zone,
 	})
-	if err != nil || server == nil || server.Server == nil {
+	if err != nil {
 		return "", fmt.Errorf("getting server %s: %w", serverID, err)
+	}
+	if server == nil || server.Server == nil {
+		return "", fmt.Errorf("getting server %s: empty response", serverID)
 	}
 
 	// Prefer private IP from Instance API (legacy VPC)
@@ -299,7 +305,7 @@ func (a *Volumes) getServerIP(serverID string) (string, error) {
 			klog.Warningf("getServerIP: IPAM query for NIC %s failed: %v", nic.ID, err)
 			continue
 		}
-		if nicIPs.TotalCount > 0 && len(nicIPs.IPs[0].Address.IP) > 0 {
+		if nicIPs.TotalCount > 0 && len(nicIPs.IPs) > 0 && len(nicIPs.IPs[0].Address.IP) > 0 {
 			return nicIPs.IPs[0].Address.IP.String(), nil
 		}
 	}
